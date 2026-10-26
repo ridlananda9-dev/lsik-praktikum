@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LSIK Praktikum - Realtime Cloud Platform</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#0c4a6e',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- JSZip & FileSaver for Batch Download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-sky-500 selection:text-white flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header id="navbar" class="hidden border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-sky-500/10 p-2 rounded-xl border border-sky-500/20 text-sky-400">
+                    <i class="fa-solid fa-microchip text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-none text-white tracking-wide">LSIK PRAKTIKUM</h1>
+                    <span class="text-xs text-slate-400 font-medium">Sistem Cloud Realtime</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <div class="text-right hidden sm:block">
+                    <div id="userDisplayName" class="text-sm font-semibold text-slate-200">Nama User</div>
+                    <div id="userRoleBadge" class="text-xs text-sky-400 font-mono">Praktikan</div>
+                </div>
+                <button id="btnChangePasswordModal" onclick="openChangePasswordModal()" class="hidden bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition border border-slate-700 flex items-center gap-1.5">
+                    <i class="fa-solid fa-key text-sky-400"></i> Ganti Password
+                </button>
+                <button onclick="handleLogout()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-right-from-bracket"></i> Keluar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <!-- Login View -->
+        <div id="viewLogin" class="min-h-[80vh] flex items-center justify-center">
+            <div class="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-2xl p-8 shadow-2xl relative overflow-hidden backdrop-blur">
+                <div class="absolute -right-12 -top-12 w-40 h-40 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div class="text-center mb-8">
+                    <div class="inline-flex p-3 rounded-2xl bg-sky-500/10 text-sky-400 border border-sky-500/20 mb-3">
+                        <i class="fa-solid fa-graduation-cap text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white tracking-tight">Portal LSIK Praktikum</h2>
+                    <p class="text-slate-400 text-xs mt-1">Silakan masuk menggunakan NRP atau Username Asisten</p>
+                </div>
+
+                <form onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">NRP / Username</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                            <input type="text" id="loginUsername" required placeholder="Masukkan NRP atau Username" class="w-full bg-slate-950 border border-slate-800 text-slate-100 text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-sky-500 transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1.5">Kata Sandi</label>
+                        <div class="relative">
+                            <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                            <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 text-slate-100 text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-sky-500 transition">
+                        </div>
+                    </div>
+
+                    <div id="loginError" class="hidden text-rose-400 text-xs bg-rose-500/10 border border-rose-500/20 p-3 rounded-xl flex items-center gap-2">
+                        <i class="fa-solid fa-circle-exclamation"></i>
+                        <span id="loginErrorMsg">Username atau password salah!</span>
+                    </div>
+
+                    <button type="submit" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-medium py-2.5 rounded-xl transition text-sm shadow-lg shadow-sky-600/20 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> Masuk Sistem
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Student View -->
+        <div id="viewStudent" class="hidden space-y-6">
+            <div id="studentAnnouncements" class="space-y-3"></div>
+            <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Daftar Modul Praktikum</h2>
+                    <p class="text-slate-400 text-xs">Pilih modul untuk mengunggah tugas atau melihat evaluasi nilai</p>
+                </div>
+            </div>
+            <div id="studentModuleList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+        </div>
+
+        <!-- Assistant View -->
+        <div id="viewAssistant" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Dashboard Kontrol Asisten Lab</h2>
+                    <p class="text-slate-400 text-xs">Kelola modul, periksa tugas praktikan, dan atur pengumuman</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="openCreateModuleModal()" class="bg-sky-600 hover:bg-sky-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i> Tambah Modul Baru
+                    </button>
+                    <button onclick="exportGradeRecap()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel"></i> Ekspor Rekap Nilai
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex border-b border-slate-800 gap-4 text-sm font-medium overflow-x-auto">
+                <button onclick="switchAssistantTab('modules')" id="tabBtnModules" class="pb-3 text-sky-400 border-b-2 border-sky-400 transition whitespace-nowrap">Daftar Modul & Tugas</button>
+                <button onclick="switchAssistantTab('announcements')" id="tabBtnAnnounce" class="pb-3 text-slate-400 hover:text-slate-200 transition whitespace-nowrap">Pengumuman Lab</button>
+            </div>
+
+            <div id="assistantTabModules" class="space-y-6">
+                <div id="assistantModuleList" class="space-y-4"></div>
+            </div>
+
+            <div id="assistantTabAnnouncements" class="hidden space-y-6">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+                    <h3 class="text-base font-bold text-white mb-3">Buat Pengumuman Baru</h3>
+                    <form onsubmit="handleCreateAnnouncement(event)" class="space-y-3">
+                        <input type="text" id="announceTitle" placeholder="Judul Pengumuman" required class="w-full bg-slate-950 border border-slate-800 text-slate-100 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-sky-500">
+                        <textarea id="announceContent" rows="3" placeholder="Isi Pengumuman..." required class="w-full bg-slate-950 border border-slate-800 text-slate-100 text-sm rounded-xl px-4 py-2 focus:outline-none focus:border-sky-500"></textarea>
+                        <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-xl text-xs font-semibold">Publikasikan Pengumuman</button>
+                    </form>
+                </div>
+                <div id="assistantAnnouncementsList" class="space-y-3"></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal Ganti Password -->
+    <div id="modalChangePassword" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 relative">
+            <h3 class="text-lg font-bold text-white mb-4">Ganti Password</h3>
+            <form onsubmit="handleChangePassword(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Password Baru</label>
+                    <input type="password" id="newPasswordInput" required minlength="6" placeholder="Masukkan password baru" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeChangePasswordModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold">Simpan Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Tambah Modul -->
+    <div id="modalCreateModule" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 relative">
+            <h3 class="text-lg font-bold text-white mb-4">Tambah Modul Praktikum</h3>
+            <form onsubmit="handleCreateModule(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Judul Modul</label>
+                    <input type="text" id="modTitle" required placeholder="Contoh: Modul 01 - Dasar Pemrograman" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Deskripsi Tugas</label>
+                    <textarea id="modDesc" rows="3" required placeholder="Instruksi pengumpulan tugas..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500"></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Batas Waktu (Deadline)</label>
+                    <input type="datetime-local" id="modDeadline" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeCreateModuleModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold">Simpan Modul</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Upload Tugas -->
+    <div id="modalUploadTask" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 relative">
+            <h3 id="uploadModalTitle" class="text-lg font-bold text-white mb-2">Upload Tugas Praktikum</h3>
+            <p id="uploadModalDesc" class="text-xs text-slate-400 mb-4"></p>
+            <form onsubmit="handleUploadTaskSubmit(event)" class="space-y-4">
+                <input type="hidden" id="uploadModuleId">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-2">Pilih File (.txt, .pdf, .doc, .docx)</label>
+                    <input type="file" id="taskFileInput" accept=".txt,.pdf,.doc,.docx" required class="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-sky-500/10 file:text-sky-400 hover:file:bg-sky-500/20">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeUploadTaskModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-semibold">Kirim Tugas</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Detail Pengumpulan -->
+    <div id="modalSubmissionsDetail" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-2xl p-6 max-h-[90vh] flex flex-col relative">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div>
+                    <h3 id="subModalModuleTitle" class="text-lg font-bold text-white">Detail Pengumpulan Tugas</h3>
+                    <p class="text-xs text-slate-400">Pantau status pengumpulan dan berikan evaluasi nilai</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btnBatchDownload" class="bg-sky-600 hover:bg-sky-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-zipper"></i> Unduh Semua (.ZIP)
+                    </button>
+                    <button onclick="closeSubmissionsModal()" class="text-slate-400 hover:text-white text-lg px-2">&times;</button>
+                </div>
+            </div>
+
+            <div class="flex border-b border-slate-800 gap-4 mb-4 text-xs font-semibold">
+                <button onclick="switchSubTab('submitted')" id="subTabSubmittedBtn" class="pb-2 text-sky-400 border-b-2 border-sky-400">Sudah Mengumpulkan (<span id="countSubmitted">0</span>)</button>
+                <button onclick="switchSubTab('unsubmitted')" id="subTabUnsubmittedBtn" class="pb-2 text-slate-400 hover:text-slate-200">Belum Mengumpulkan (<span id="countUnsubmitted">0</span>)</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto pr-1">
+                <div id="subListSubmitted" class="space-y-3"></div>
+                <div id="subListUnsubmitted" class="hidden space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        // DATA PRAKTIKAN LENGKAP DARI EXCEL (117 NAMA & NRP)
+        const INITIAL_PRAKTIKAN = [
+            { nrp: "25.10100", name: "MUHAMMAD RAKHI" },
+            { nrp: "25.10091", name: "REFA SILVYA MAHARANI" },
+            { nrp: "25.10006", name: "KEZIA NIDA AZZAHRA" },
+            { nrp: "25.10021", name: "SUKMA SAHRUL HIDAYAT" },
+            { nrp: "25.10016", name: "LOYDYA VAESSENS ISABELL" },
+            { nrp: "25.10108", name: "ACHMAD ZHIAN NURDIN" },
+            { nrp: "25.10129", name: "KHETRINA SOPANDI" },
+            { nrp: "25.10042", name: "INAYAH FAIZAH" },
+            { nrp: "25.10097", name: "CHIKA RAESWA ELVARIEF" },
+            { nrp: "25.10099", name: "FACHRI MUHAMMAD GUSTIANTO" },
+            { nrp: "25.10043", name: "BINTANG BAREP PRAKOSA" },
+            { nrp: "25.10098", name: "HUGO GHUFRANANDA PRIMA" },
+            { nrp: "25.10018", name: "ADITYA MULYAWAN" },
+            { nrp: "25.10034", name: "SENDI SALSABILA" },
+            { nrp: "25.10127", name: "BINTANG NAUFAL TANJUNG" },
+            { nrp: "25.10113", name: "REIYVI REVALDI KHAERUL AGILLAH" },
+            { nrp: "25.10128", name: "LUTHFI RADITYA ZAIDAN" },
+            { nrp: "25.10104", name: "RAZKI QUASTIL AMAL" },
+            { nrp: "25.10041", name: "GHILMAN HIZBUL ISLAM" },
+            { nrp: "25.10039", name: "AZKIA TARITHA RAMADHINA" },
+            { nrp: "25.10052", name: "FAIZZATUR RIZQIYAH" },
+            { nrp: "25.10090", name: "FARIS FISABILILLAH" },
+            { nrp: "25.10002", name: "ARFA AULADI HASAN" },
+            { nrp: "25.10022", name: "NAZQIYA AULI ZAHRIANI" },
+            { nrp: "25.10020", name: "MUHAMMAD ZAKI HIDAYAT" },
+            { nrp: "25.10053", name: "SYOFRIANDA FAJAR DJIKRI" },
+            { nrp: "25.10028", name: "NISRINA HASRI AINUN" },
+            { nrp: "25.10034", name: "REKSI ADIPATI" },
+            { nrp: "25.10127", name: "CIKAL RAIH PURNAMA" },
+            { nrp: "25.10113", name: "MUHAMMAD ZAKI ADITYA" },
+            { nrp: "25.10128", name: "IPAN PADILAH" },
+            { nrp: "25.10104", name: "IRFAN MAULANA" },
+            { nrp: "25.10041", name: "FEBRY HERINA" },
+            { nrp: "25.10039", name: "SANIA SILMI" },
+            { nrp: "25.10052", name: "WIVIA TIKU MANGESA" },
+            { nrp: "25.10090", name: "IRVAN ABDULLAH MAFAHIR APANDI" },
+            { nrp: "25.10002", name: "GILANG PRATAMA" },
+            { nrp: "25.10022", name: "GIAT ENJELITA SAMUDRA" },
+            { nrp: "25.10020", name: "TIAN NANDA SAPUTRA" },
+            { nrp: "25.10053", name: "ZIDAN RIZQI AL GIFARI" },
+            { nrp: "25.10013", name: "RIZQY PANJI RAMADHAN" },
+            { nrp: "25.10031", name: "AISYAH NURUL UTAMI" },
+            { nrp: "25.10023", name: "NAZWA UTAMI YUSUP" },
+            { nrp: "25.10003", name: "MEYDINA NUR' AMALIA" },
+            { nrp: "25.10009", name: "YUDA CHANDRA PUTRA" },
+            { nrp: "25.10102", name: "AGREL RIFFAT AKASYAH" },
+            { nrp: "25.10062", name: "IHSAN MAULANA FADILLAH" },
+            { nrp: "25.10070", name: "SYIFA NURFAIZAH" },
+            { nrp: "25.10120", name: "DZAKY RHAMDANI" },
+            { nrp: "25.10049", name: "MUHAMAD ANDRIAN RIPALDI" },
+            { nrp: "25.10012", name: "IKE NURHASANAH" },
+            { nrp: "25.10008", name: "KAFKA NAVISA" },
+            { nrp: "25.10086", name: "SAUQY AL-KINDI" },
+            { nrp: "25.10054", name: "YUSUF SETYADI FATHURROZY" },
+            { nrp: "25.10085", name: "MUHAMMAD MIRZA RASPATY PERMANA" },
+            { nrp: "25.10088", name: "MUHAMMAD GANDHY ANDREANSYAH" },
+            { nrp: "25.10033", name: "ARIQOH KHOIRON NASHRULLAH" },
+            { nrp: "25.10036", name: "ACHMAD RESTU WHIRAYUDHA" },
+            { nrp: "25.10005", name: "SAID AGIL AL MUNAWAR" },
+            { nrp: "25.10079", name: "ABGHI AL HASYA RAMADHAN" },
+            { nrp: "25.10075", name: "ALIF GALIH PURNOMO" },
+            { nrp: "25.10077", name: "NAUFAL DHOFATUL ASSY RAMADHAN RUSDIAMAN" },
+            { nrp: "25.10024", name: "ALEZA PUTRA PERMANA" },
+            { nrp: "25.10066", name: "FRISKA LISMARANDA" },
+            { nrp: "25.10111", name: "MA'RIF HIDAYAT" },
+            { nrp: "25.10065", name: "NAJAR MAULANA" },
+            { nrp: "25.10071", name: "GANENDRA AZRI NARARYA" },
+            { nrp: "25.10056", name: "RIVA FADHILAH" },
+            { nrp: "25.10060", name: "JIHAD SIHAB" },
+            { nrp: "25.10116", name: "FEBRIYAN MUHAMMAD PADZLI" },
+            { nrp: "25.10084", name: "SAMUDRA ATMADIJAJA" },
+            { nrp: "25.10048", name: "JHON RISKY PRATAMA MANIHURUK" },
+            { nrp: "25.10101", name: "M NABIL AVEROUSE CHANDRA WIJAYA" },
+            { nrp: "25.10121", name: "MUHAMAD ARIEF FADHILAH PRIYONO" },
+            { nrp: "25.10118", name: "IRFAN FAUZI" },
+            { nrp: "25.10019", name: "ZILDJI NABAWI IRAWAN" },
+            { nrp: "25.10032", name: "MIKAIL BAYHAQI CHANIAGO" },
+            { nrp: "25.10010", name: "AHMAD ZIQRI" },
+            { nrp: "25.10004", name: "FAJAR AL FAWAJ" },
+            { nrp: "23.10098", name: "RABBANI AKMAL ADDRITAMA" },
+            { nrp: "25.10083", name: "DIMAS SETIAWAN" },
+            { nrp: "25.10026", name: "REZKI ZAINURI RAHAYU" },
+            { nrp: "25.10087", name: "TEGAR SEPTI PRAMUDIYANTO" },
+            { nrp: "25.10089", name: "RAIHAN HADI SURYA" },
+            { nrp: "25.10076", name: "QAIS PANJI NARA" },
+            { nrp: "25.10080", name: "ADINDA ZAHRA" },
+            { nrp: "25.10046", name: "RHADITYA CANDRA" },
+            { nrp: "25.10074", name: "HARIS BAMBANG SUBIANTO" },
+            { nrp: "25.10059", name: "FACHRI AZRIEL HIDAYAT" },
+            { nrp: "25.10067", name: "ZULDZIAN RAIHANDHANI" },
+            { nrp: "25.10014", name: "SYAHRI DIRGA AZHIMA" },
+            { nrp: "25.10095", name: "DZAKY HASBY ASJUHAILY" },
+            { nrp: "25.10078", name: "CITRA DIAN LESTARI" },
+            { nrp: "23.10056", name: "MUHAMAD ZIDAN" },
+            { nrp: "23.10084", name: "HANDIKA WAHYUNDIA" },
+            { nrp: "25.10064", name: "HASNA ALIFAH RAMADHANI" },
+            { nrp: "25.10073", name: "DHEANDRA PUTRI RAIA OLIVIA" },
+            { nrp: "25.10055", name: "ZULFA DWI PRASETIYA" },
+            { nrp: "25.10093", name: "DIAZ PEDROSA" },
+            { nrp: "25.10109", name: "MUHAMAD DZIKRI NURJAMIL" },
+            { nrp: "25.10081", name: "NAYLA SALSAZAHRA ALIFA GUNAWAN" },
+            { nrp: "25.10057", name: "ROSA AZZAHRA" },
+            { nrp: "25.10125", name: "DANIEL OKTAVIANUS ANDANA" },
+            { nrp: "25.10115", name: "RAYGA MAYESA RAHADIAN" },
+            { nrp: "23.10005", name: "DAVIN NURMAN RAMADHAN" },
+            { nrp: "23.10007", name: "MARCELL ARIEF NUGRAHA" },
+            { nrp: "25.10029", name: "MUHAMMAD PAJRIANSYAH RAMDANI" },
+            { nrp: "25.10106", name: "FAUZAAN BINTANG PURNOMO" },
+            { nrp: "25.10040", name: "NISRINA NUR FATHIN" },
+            { nrp: "25.10025", name: "MUHAMMAD GERALD FADHLILLAH" },
+            { nrp: "25.10038", name: "TEGUH" },
+            { nrp: "25.10117", name: "ARSHADITA QUINNA SYAZLIN" },
+            { nrp: "25.10126", name: "M GIBRAN MAHARDIKA DIYAUL HAQ" },
+            { nrp: "25.10007", name: "DAVY IRHAMSYAH" },
+            { nrp: "25.10069", name: "YUDISTHIRA RAYI MAHESA" },
+            { nrp: "25.10112", name: "ANGGA YUDA PRATAMA" },
+            { nrp: "25.10011", name: "NINDA AULIA" }
+        ];
+
+        const ASSISTANTS = Array.from({ length: 10 }, (_, i) => {
+            const num = String(i + 1).padStart(2, '0');
+            return { username: `Asisten ${num}`, pass: 'Mawar2627', name: `Asisten Lab ${num}` };
+        });
+
+        // -------------------------------------------------------------
+        // KONFIGURASI FIREBASE CLOUD FIRESTORE
+        // (SALIN & TEMPEL KODE firebaseConfig DARI FIREBASE CONSOLE ANDA)
+        // -------------------------------------------------------------
+        const firebaseConfig = {
+  apiKey: "AIzaSyCqdCDdgWegWjqc5c1qbGJZ-eXJlmXW7Dk",
+  authDomain: "lsik-cloud.firebaseapp.com",
+  projectId: "lsik-cloud",
+  storageBucket: "lsik-cloud.firebasestorage.app",
+  messagingSenderId: "624736099788",
+  appId: "1:624736099788:web:539eab0b109f0addd15169"
+};
+
+        // Inisialisasi Firebase Cloud
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // State Aplikasi Local
+        let state = {
+            currentUser: null,
+            studentPasswords: {},
+            modules: [],
+            submissions: [],
+            announcements: []
+        };
+
+        // -------------------------------------------------------------
+        // LISTENERS REALTIME CLOUD (SINKRONISASI SEMUA PERANGKAT)
+        // -------------------------------------------------------------
+        
+        // 1. Sync Modul Praktikum
+        db.collection("modules").onSnapshot((snapshot) => {
+            let list = [];
+            snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+            state.modules = list;
+            if (state.currentUser) {
+                if (state.currentUser.role === 'student') renderStudentView();
+                else renderAssistantView();
+            }
+        });
+
+        // 2. Sync Pengumpulan Tugas
+        db.collection("submissions").onSnapshot((snapshot) => {
+            let list = [];
+            snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+            state.submissions = list;
+            if (state.currentUser) {
+                if (state.currentUser.role === 'student') renderStudentView();
+                else {
+                    renderAssistantView();
+                    if (currentActiveModuleId) renderSubmissionsTabContent();
+                }
+            }
+        });
+
+        // 3. Sync Pengumuman
+        db.collection("announcements").onSnapshot((snapshot) => {
+            let list = [];
+            snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+            list.sort((a,b) => (b.createdAt || 0) - (a.createdAt || 0));
+            state.announcements = list;
+            if (state.currentUser) {
+                if (state.currentUser.role === 'student') renderStudentView();
+                else renderAssistantView();
+            }
+        });
+
+        // 4. Sync Password Praktikan
+        db.collection("passwords").doc("students").onSnapshot((doc) => {
+            if (doc.exists) state.studentPasswords = doc.data() || {};
+        });
+
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedUser = sessionStorage.getItem('lsik_user');
+            if (savedUser) {
+                state.currentUser = JSON.parse(savedUser);
+                showDashboard();
+            } else {
+                showLogin();
+            }
+        });
+
+        function showLogin() {
+            document.getElementById('navbar').classList.add('hidden');
+            document.getElementById('viewLogin').classList.remove('hidden');
+            document.getElementById('viewStudent').classList.add('hidden');
+            document.getElementById('viewAssistant').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('navbar').classList.remove('hidden');
+            document.getElementById('viewLogin').classList.add('hidden');
+
+            const u = state.currentUser;
+            document.getElementById('userDisplayName').textContent = u.name;
+            document.getElementById('userRoleBadge').textContent = u.role === 'assistant' ? 'Asisten Lab' : `NRP: ${u.username}`;
+
+            if (u.role === 'student') {
+                document.getElementById('btnChangePasswordModal').classList.remove('hidden');
+                document.getElementById('viewStudent').classList.remove('hidden');
+                document.getElementById('viewAssistant').classList.add('hidden');
+                renderStudentView();
+            } else {
+                document.getElementById('btnChangePasswordModal').classList.add('hidden');
+                document.getElementById('viewStudent').classList.add('hidden');
+                document.getElementById('viewAssistant').classList.remove('hidden');
+                renderAssistantView();
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const unInput = document.getElementById('loginUsername').value.trim();
+            const passInput = document.getElementById('loginPassword').value.trim();
+            const errBox = document.getElementById('loginError');
+
+            errBox.classList.add('hidden');
+
+            // Cek Asisten
+            const asst = ASSISTANTS.find(a => a.username.toLowerCase() === unInput.toLowerCase());
+            if (asst) {
+                if (passInput === asst.pass) {
+                    state.currentUser = { username: asst.username, name: asst.name, role: 'assistant' };
+                    sessionStorage.setItem('lsik_user', JSON.stringify(state.currentUser));
+                    showDashboard();
+                    return;
+                } else {
+                    showLoginErr("Password Asisten salah!");
+                    return;
+                }
+            }
+
+            // Cek Praktikan
+            const inputDigits = unInput.replace(/[^0-9]/g, '');
+            const student = INITIAL_PRAKTIKAN.find(p => {
+                const pDigits = p.nrp.replace(/[^0-9]/g, '');
+                return p.nrp.toLowerCase() === unInput.toLowerCase() || (inputDigits && pDigits === inputDigits);
+            });
+
+            if (student) {
+                const studentKey = student.nrp.replace(/[^0-9]/g, '');
+                const customPass = state.studentPasswords[studentKey];
+                const expectedPass = customPass || 'Pemkom2627';
+
+                if (passInput === expectedPass) {
+                    state.currentUser = { username: student.nrp, name: student.name, role: 'student' };
+                    sessionStorage.setItem('lsik_user', JSON.stringify(state.currentUser));
+                    showDashboard();
+                    return;
+                } else {
+                    showLoginErr("Password praktikan salah! Gunakan password Pemkom2627.");
+                    return;
+                }
+            }
+
+            showLoginErr("NRP / Username tidak terdaftar!");
+        }
+
+        function showLoginErr(msg) {
+            document.getElementById('loginErrorMsg').textContent = msg;
+            document.getElementById('loginError').classList.remove('hidden');
+        }
+
+        function handleLogout() {
+            sessionStorage.removeItem('lsik_user');
+            state.currentUser = null;
+            showLogin();
+        }
+
+        function openChangePasswordModal() {
+            document.getElementById('modalChangePassword').classList.remove('hidden');
+        }
+        function closeChangePasswordModal() {
+            document.getElementById('modalChangePassword').classList.add('hidden');
+        }
+        async function handleChangePassword(e) {
+            e.preventDefault();
+            const newP = document.getElementById('newPasswordInput').value.trim();
+            if (newP.length < 6) {
+                alert("Password minimal 6 karakter!");
+                return;
+            }
+            const studentKey = state.currentUser.username.replace(/[^0-9]/g, '');
+            
+            // Simpan ke Cloud Firestore
+            state.studentPasswords[studentKey] = newP;
+            await db.collection("passwords").doc("students").set(state.studentPasswords, { merge: true });
+            
+            closeChangePasswordModal();
+            alert("Password berhasil diperbarui!");
+        }
+
+        function renderStudentView() {
+            const annBox = document.getElementById('studentAnnouncements');
+            annBox.innerHTML = state.announcements.map(a => `
+                <div class="bg-sky-500/10 border border-sky-500/20 rounded-2xl p-4 text-xs">
+                    <div class="flex items-center justify-between text-sky-400 font-semibold mb-1">
+                        <span><i class="fa-solid fa-bullhorn mr-1"></i> ${escapeHtml(a.title)}</span>
+                        <span class="text-slate-500 font-mono text-[10px]">${a.date}</span>
+                    </div>
+                    <p class="text-slate-300">${escapeHtml(a.content)}</p>
+                </div>
+            `).join('');
+
+            const modBox = document.getElementById('studentModuleList');
+            modBox.innerHTML = state.modules.map(m => {
+                const sub = state.submissions.find(s => s.moduleId === m.id && s.nrp === state.currentUser.username);
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-lg">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-mono text-sky-400 font-semibold"><i class="fa-solid fa-book mr-1"></i> Modul</span>
+                                ${sub ? `<span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] px-2 py-0.5 rounded-full font-medium">Sudah Dikirim</span>` 
+                                      : `<span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] px-2 py-0.5 rounded-full font-medium">Belum Dikirim</span>`}
+                            </div>
+                            <h3 class="font-bold text-white text-base mb-1">${escapeHtml(m.title)}</h3>
+                            <p class="text-xs text-slate-400 mb-4 line-clamp-3">${escapeHtml(m.desc)}</p>
+                        </div>
+
+                        <div class="space-y-3 pt-3 border-t border-slate-800/80">
+                            <div class="flex items-center justify-between text-[11px] text-slate-500">
+                                <span><i class="fa-regular fa-clock mr-1"></i> Deadline:</span>
+                                <span class="font-mono text-slate-300">${m.deadline ? m.deadline.replace('T', ' ') : '-'}</span>
+                            </div>
+
+                            ${sub ? `
+                                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
+                                    <div class="text-slate-400 text-[10px]">File Anda: <strong class="text-slate-200">${escapeHtml(sub.fileName)}</strong></div>
+                                    <div class="flex justify-between items-center text-[10px]">
+                                        <span class="text-slate-500">Nilai:</span>
+                                        <span class="font-bold text-sky-400 text-sm">${sub.grade !== null && sub.grade !== undefined ? sub.grade : 'Belum Dinilai'}</span>
+                                    </div>
+                                    ${sub.feedback ? `<div class="text-[10px] text-slate-400 italic">Catatan: "${escapeHtml(sub.feedback)}"</div>` : ''}
+                                </div>
+                            ` : ''}
+
+                            <button onclick="openUploadTaskModal('${m.id}')" class="w-full bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-md shadow-sky-600/20">
+                                <i class="fa-solid fa-upload"></i> ${sub ? 'Unggah Ulang File' : 'Unggah Tugas'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function openUploadTaskModal(moduleId) {
+            const m = state.modules.find(x => x.id === moduleId);
+            document.getElementById('uploadModuleId').value = moduleId;
+            document.getElementById('uploadModalTitle').textContent = `Upload Tugas: ${m.title}`;
+            document.getElementById('uploadModalDesc').textContent = m.desc;
+            document.getElementById('modalUploadTask').classList.remove('hidden');
+        }
+        function closeUploadTaskModal() {
+            document.getElementById('modalUploadTask').classList.add('hidden');
+        }
+        function handleUploadTaskSubmit(e) {
+            e.preventDefault();
+            const modId = document.getElementById('uploadModuleId').value;
+            const fileInput = document.getElementById('taskFileInput');
+            const file = fileInput.files[0];
+
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(evt) {
+                const subId = `sub_${modId}_${state.currentUser.username.replace(/[^0-9]/g, '')}`;
+                
+                // Kirim Tugas Langsung ke Cloud Firestore
+                await db.collection("submissions").doc(subId).set({
+                    id: subId,
+                    moduleId: modId,
+                    nrp: state.currentUser.username,
+                    studentName: state.currentUser.name,
+                    fileName: file.name,
+                    fileData: evt.target.result,
+                    uploadDate: new Date().toLocaleString('id-ID'),
+                    grade: null,
+                    feedback: ''
+                });
+
+                closeUploadTaskModal();
+                alert('Tugas berhasil diunggah ke Cloud!');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderAssistantView() {
+            const modBox = document.getElementById('assistantModuleList');
+            modBox.innerHTML = state.modules.map(m => {
+                const subs = state.submissions.filter(s => s.moduleId === m.id);
+                return `
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+                        <div class="space-y-1">
+                            <h3 class="font-bold text-white text-base">${escapeHtml(m.title)}</h3>
+                            <p class="text-xs text-slate-400">${escapeHtml(m.desc)}</p>
+                            <div class="text-[11px] text-slate-500 pt-1">
+                                <span class="mr-3"><i class="fa-regular fa-clock mr-1"></i> Deadline: ${m.deadline ? m.deadline.replace('T', ' ') : '-'}</span>
+                                <span><i class="fa-solid fa-users mr-1"></i> Mengumpulkan: <strong class="text-sky-400">${subs.length} / ${INITIAL_PRAKTIKAN.length}</strong></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 w-full md:w-auto">
+                            <button onclick="openSubmissionsModal('${m.id}')" class="flex-1 md:flex-none bg-sky-600/10 hover:bg-sky-600/20 text-sky-400 border border-sky-500/20 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-list-check"></i> Periksa Pengumpulkan
+                            </button>
+                            <button onclick="deleteModule('${m.id}')" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-3 py-2.5 rounded-xl text-xs transition">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const annBox = document.getElementById('assistantAnnouncementsList');
+            annBox.innerHTML = state.announcements.map(a => `
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center justify-between">
+                    <div>
+                        <h4 class="font-bold text-white text-sm">${escapeHtml(a.title)}</h4>
+                        <p class="text-xs text-slate-400">${escapeHtml(a.content)}</p>
+                        <span class="text-[10px] text-slate-500 font-mono">${a.date}</span>
+                    </div>
+                    <button onclick="deleteAnnouncement('${a.id}')" class="text-rose-400 hover:text-rose-300 text-xs px-2 py-1"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function switchAssistantTab(tab) {
+            if (tab === 'modules') {
+                document.getElementById('assistantTabModules').classList.remove('hidden');
+                document.getElementById('assistantTabAnnouncements').classList.add('hidden');
+                document.getElementById('tabBtnModules').className = "pb-3 text-sky-400 border-b-2 border-sky-400 transition whitespace-nowrap";
+                document.getElementById('tabBtnAnnounce').className = "pb-3 text-slate-400 hover:text-slate-200 transition whitespace-nowrap";
+            } else {
+                document.getElementById('assistantTabModules').classList.add('hidden');
+                document.getElementById('assistantTabAnnouncements').classList.remove('hidden');
+                document.getElementById('tabBtnAnnounce').className = "pb-3 text-sky-400 border-b-2 border-sky-400 transition whitespace-nowrap";
+                document.getElementById('tabBtnModules').className = "pb-3 text-slate-400 hover:text-slate-200 transition whitespace-nowrap";
+            }
+        }
+
+        function openCreateModuleModal() {
+            document.getElementById('modalCreateModule').classList.remove('hidden');
+        }
+        function closeCreateModuleModal() {
+            document.getElementById('modalCreateModule').classList.add('hidden');
+        }
+        async function handleCreateModule(e) {
+            e.preventDefault();
+            const modId = 'mod_' + Date.now();
+            await db.collection("modules").doc(modId).set({
+                title: document.getElementById('modTitle').value.trim(),
+                desc: document.getElementById('modDesc').value.trim(),
+                deadline: document.getElementById('modDeadline').value
+            });
+            closeCreateModuleModal();
+        }
+        async function deleteModule(modId) {
+            if (!confirm('Hapus modul ini dari cloud?')) return;
+            await db.collection("modules").doc(modId).delete();
+        }
+
+        async function handleCreateAnnouncement(e) {
+            e.preventDefault();
+            const annId = 'ann_' + Date.now();
+            await db.collection("announcements").doc(annId).set({
+                title: document.getElementById('announceTitle').value.trim(),
+                content: document.getElementById('announceContent').value.trim(),
+                date: new Date().toLocaleString('id-ID'),
+                createdAt: Date.now()
+            });
+            e.target.reset();
+        }
+        async function deleteAnnouncement(annId) {
+            await db.collection("announcements").doc(annId).delete();
+        }
+
+        let currentActiveModuleId = null;
+
+        function openSubmissionsModal(modId) {
+            currentActiveModuleId = modId;
+            const mod = state.modules.find(m => m.id === modId);
+            document.getElementById('subModalModuleTitle').textContent = `Tugas: ${mod ? mod.title : ''}`;
+            document.getElementById('btnBatchDownload').onclick = () => downloadAllSubmissionsForModule(modId);
+
+            renderSubmissionsTabContent();
+            document.getElementById('modalSubmissionsDetail').classList.remove('hidden');
+        }
+
+        function closeSubmissionsModal() {
+            document.getElementById('modalSubmissionsDetail').classList.add('hidden');
+        }
+
+        function switchSubTab(type) {
+            if (type === 'submitted') {
+                document.getElementById('subListSubmitted').classList.remove('hidden');
+                document.getElementById('subListUnsubmitted').classList.add('hidden');
+                document.getElementById('subTabSubmittedBtn').className = "pb-2 text-sky-400 border-b-2 border-sky-400 font-semibold";
+                document.getElementById('subTabUnsubmittedBtn').className = "pb-2 text-slate-400 hover:text-slate-200 font-semibold";
+            } else {
+                document.getElementById('subListSubmitted').classList.add('hidden');
+                document.getElementById('subListUnsubmitted').classList.remove('hidden');
+                document.getElementById('subTabUnsubmittedBtn').className = "pb-2 text-sky-400 border-b-2 border-sky-400 font-semibold";
+                document.getElementById('subTabSubmittedBtn').className = "pb-2 text-slate-400 hover:text-slate-200 font-semibold";
+            }
+        }
+
+        function renderSubmissionsTabContent() {
+            const modId = currentActiveModuleId;
+            const submittedList = state.submissions.filter(s => s.moduleId === modId);
+            const submittedNRPs = new Set(submittedList.map(s => s.nrp));
+            const unsubmittedList = INITIAL_PRAKTIKAN.filter(p => !submittedNRPs.has(p.nrp));
+
+            document.getElementById('countSubmitted').textContent = submittedList.length;
+            document.getElementById('countUnsubmitted').textContent = unsubmittedList.length;
+
+            const subBox = document.getElementById('subListSubmitted');
+            if (submittedList.length === 0) {
+                subBox.innerHTML = `<div class="text-center py-8 text-xs text-slate-500">Belum ada praktikan yang mengumpulkan tugas untuk modul ini.</div>`;
+            } else {
+                subBox.innerHTML = submittedList.map(s => `
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                        <div>
+                            <div class="font-bold text-slate-200 text-sm">${escapeHtml(s.studentName)} <span class="text-xs font-mono text-sky-400 font-normal">(${s.nrp})</span></div>
+                            <div class="text-xs text-slate-400">File: <a href="${s.fileData}" download="${s.fileName}" class="text-sky-400 hover:underline"><i class="fa-solid fa-download mr-1"></i>${escapeHtml(s.fileName)}</a></div>
+                            <div class="text-[10px] text-slate-500">Waktu: ${s.uploadDate}</div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            <input type="number" min="0" max="100" id="grade-${s.id}" value="${s.grade !== null && s.grade !== undefined ? s.grade : ''}" placeholder="Nilai" class="w-20 bg-slate-900 border border-slate-700 text-center text-xs text-white rounded-lg py-1.5 focus:outline-none focus:border-sky-500">
+                            <input type="text" id="feedback-${s.id}" value="${escapeHtml(s.feedback || '')}" placeholder="Catatan evaluasi..." class="flex-1 md:w-48 bg-slate-900 border border-slate-700 text-xs text-white rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-500">
+                            <button onclick="saveGrade('${s.id}')" class="bg-sky-600 hover:bg-sky-500 text-white text-xs px-3 py-1.5 rounded-lg font-semibold transition">Simpan</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const unsubBox = document.getElementById('subListUnsubmitted');
+            unsubBox.innerHTML = unsubmittedList.map(p => `
+                <div class="bg-slate-950 border border-slate-800/60 rounded-xl p-3 flex items-center justify-between text-xs">
+                    <div class="font-medium text-slate-300">${escapeHtml(p.name)}</div>
+                    <div class="font-mono text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded text-[11px]">${p.nrp}</div>
+                </div>
+            `).join('');
+        }
+
+        async function saveGrade(subId) {
+            const gVal = document.getElementById(`grade-${subId}`).value;
+            const fVal = document.getElementById(`feedback-${subId}`).value;
+
+            // Update Nilai ke Cloud Firestore
+            await db.collection("submissions").doc(subId).update({
+                grade: gVal !== '' ? Number(gVal) : null,
+                feedback: fVal
+            });
+            alert('Nilai berhasil disimpan ke Cloud!');
+        }
+
+        async function downloadAllSubmissionsForModule(modId) {
+            const mod = state.modules.find(m => m.id === modId);
+            const subs = state.submissions.filter(s => s.moduleId === modId);
+
+            if (subs.length === 0) {
+                alert('Belum ada tugas yang dapat diunduh untuk modul ini.');
+                return;
+            }
+
+            const zip = new JSZip();
+            const folder = zip.folder((mod ? mod.title : 'Modul').replace(/[^a-zA-Z0-9_-]/g, '_'));
+
+            subs.forEach(s => {
+                const base64Content = s.fileData.split(',')[1];
+                const fileName = `${s.nrp}_${s.studentName.replace(/[^a-zA-Z0-9_-]/g, '_')}_${s.fileName}`;
+                folder.file(fileName, base64Content, { base64: true });
+            });
+
+            const content = await zip.generateAsync({ type: 'blob' });
+            saveAs(content, `Tugas_${(mod ? mod.title : 'Modul').replace(/[^a-zA-Z0-9_-]/g, '_')}.zip`);
+        }
+
+        function exportGradeRecap() {
+            let csv = 'NRP,Nama Praktikan';
+            state.modules.forEach(m => {
+                csv += `,"${m.title.replace(/"/g, '""')}"`;
+            });
+            csv += '\n';
+
+            INITIAL_PRAKTIKAN.forEach(p => {
+                csv += `"${p.nrp}","${p.name.replace(/"/g, '""')}"`;
+                state.modules.forEach(m => {
+                    const sub = state.submissions.find(s => s.moduleId === m.id && s.nrp === p.nrp);
+                    const gradeStr = (sub && sub.grade !== null && sub.grade !== undefined) ? sub.grade : (sub ? 'Belum Dinilai' : 'Belum Mengumpulkan');
+                    csv += `,"${gradeStr}"`;
+                });
+                csv += '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            saveAs(blob, 'Rekap_Nilai_Praktikum_LSIK.csv');
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+    </script>
+</body>
+</html>
